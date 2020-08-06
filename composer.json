@@ -1,0 +1,30 @@
+{
+  "name": "slytherincz/api-client-skeleton",
+  "description": "description",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "license": "proprietary",
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "git@github.com:SlytherinCz/api-client-contracts.git"
+    }
+  ],
+  "authors": [
+    {
+      "name": "Karel Mladý",
+      "email": "me@karel-mlady.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {"SlytherinCz\\ApiClient\\": "src/"}
+  },
+  "require": {
+    "psr/http-message": "^1.0.0",
+    "psr/http-client":"^1.0.0",
+    "psr/http-factory": "^1.0.1",
+    "slytherincz/api-client-contracts": "master",
+    "ext-json": "*",
+    "php-http/discovery": "^1.9"
+  }
+}
