@@ -2,6 +2,7 @@
 
 namespace SlytherinCz\ApiClient;
 
+use SlytherinCz\ApiClient\Service\RequestException;
 use SlytherinCz\ApiClient\Service\ResponseHandler;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
@@ -11,38 +12,28 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\UriFactoryInterface;
 
-class RequestWrapper
-{
-    /**
-     * @var ClientInterface
-     */
+class RequestWrapper {
     private ClientInterface $httpClient;
 
-    /**
-     * @var RequestFactoryInterface
-     */
     private RequestFactoryInterface $requestFactory;
 
-    /**
-     * @var string
-     */
     private string $basePath;
-    /**
-     * @var StreamFactoryInterface
-     */
+
     private StreamFactoryInterface $streamFactory;
 
     private array $defaultHeaders;
 
     private array $options;
-    /**
-     * @var UriFactoryInterface
-     */
+
     private UriFactoryInterface $uriFactory;
-    /**
-     * @var ResponseHandler
-     */
+
     private ResponseHandler $responseHandler;
+
+    private ?RequestInterface $request = null;
+
+    private int $maxRedirects = 10;
+
+    private int $redirectCount = 0;
 
     /**
      * RequestWrapper constructor.
@@ -74,6 +65,10 @@ class RequestWrapper
         $this->options = $options;
         $this->uriFactory = $uriFactory;
         $this->responseHandler = $responseHandler;
+
+        if(is_int($options['max_redirects'])) {
+            $this->maxRedirects = $options['max_redirects'];
+        }
     }
 
     /**
@@ -124,15 +119,44 @@ class RequestWrapper
         string $protocolVersion = '1.1'
     ): ResponseInterface
     {
-        $request = $this->buildRequest(
+        $this->request = $this->buildRequest(
             $method,
             $this->basePath . $uri,
             $headers,
             $body,
             $protocolVersion
         );
+        $sentRequest = clone $this->request;
+        $response = $this->sendRequest($sentRequest);
+        $this->responseHandler->handleResponse($response, $sentRequest);
+        return $response;
+    }
+
+    /**
+     * @param RequestInterface $request
+     * @return ResponseInterface
+     * @throws ClientExceptionInterface
+     */
+    private function sendRequest(RequestInterface $request): ResponseInterface
+    {
         $response = $this->httpClient->sendRequest($request);
-        $this->responseHandler->handleResponse($response, $request);
+        if($response->getStatusCode() >= 300 && $response->getStatusCode() < 400 ) {
+            if($this->redirectCount > $this->maxRedirects) {
+                throw new RequestException($request, 'Too many Redirects');
+            }
+            $redirectedRequest = clone $this->request;
+            $redirectUri = $response->getHeader('location')[0];
+            if(!is_string($redirectUri)) {
+                throw new RequestException(
+                    $redirectedRequest,
+                    'Redirect HTTP Status received, but no Location header was present in the response'
+                );
+            }
+            $redirectedRequest = $redirectedRequest->withUri($this->uriFactory->createUri($redirectUri));
+            ++$this->redirectCount;
+            return $this->sendRequest($redirectedRequest);
+        }
+        $this->redirectCount = 0;
         return $response;
     }
 
