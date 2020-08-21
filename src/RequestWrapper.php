@@ -66,7 +66,7 @@ class RequestWrapper {
         $this->uriFactory = $uriFactory;
         $this->responseHandler = $responseHandler;
 
-        if(is_int($options['max_redirects'])) {
+        if(!empty($options['max_redirects']) && is_int($options['max_redirects'])) {
             $this->maxRedirects = $options['max_redirects'];
         }
     }
